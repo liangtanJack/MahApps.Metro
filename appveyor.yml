@@ -1,85 +1,42 @@
-# configuration for develop/CI branch
+# http://www.appveyor.com/docs/appveyor-yml
 
--
-  branches:
-    only:
-      - develop
+branches:
+  only:
+    - develop
+    - main
 
-  skip_tags: true
-  image: Visual Studio 2017
-  configuration: Release
-  platform: Any CPU
+environment:
+  azure-key-vault-url:
+    secure: 1mKS/HfCVq+iYNRVSrrN8NEowOkKt3knrpMzw+SOy3g=
+  azure-key-vault-client-id:
+    secure: JfSqzmsJdXB6uIxttCRoQw1NygwxqXHDj9uIqQnWOb9VCnQYlRPlAnxgW0yTSX4b
+  azure-key-vault-client-secret:
+    secure: CUpRJxMLeUZwNPMcqI0wECaWfy5AMnWn1UZhBd9WnQ3Z16lJP1Vzrkf24mccbhUD
+  azure-key-vault-certificate:
+    secure: BSPdW2TgnQtoQXXbeDECug==
 
-  pull_requests:
-    do_not_increment_build_number: false
+skip_tags: true
+image: Visual Studio 2019
+test: off
 
-  install:
-    - choco install gitversion.portable -pre -y
+install:
+  #- cinst dotnetcore-sdk --version=3.1.100
 
-  before_build:
-    - ps: cd src
-    - ps: .paket\paket restore
-    - ps: cd..
-    - ps: gitversion /l console /output buildserver /updateAssemblyInfo
+pull_requests:
+  do_not_increment_build_number: false
 
-  build:
-    verbosity: minimal
+build_script:
+  - ps: .\build.ps1 -target appveyor
 
-  after_build:
-    - ps: cd src
-    - ps: .paket\paket pack --version $env:GitVersion_NuGetVersion bin
-    - ps: cd..
+after_build:
+  - ps: gci -Filter *.trx -Path .\TestResults\ | % { (New-Object 'System.Net.WebClient').UploadFile("https://ci.appveyor.com/api/testresults/mstest/$($env:APPVEYOR_JOB_ID)", (Resolve-Path $_.FullName)) }
 
-  cache:
-    - src\packages -> **\packages.config
-    # - '%USERPROFILE%\.nuget\packages -> **\project.json'
+artifacts:
+  - path: \Publish\*.*
 
-  artifacts:
-    - path: \src\bin\MahApps.Metro.*.nupkg
-    - path: \src\bin\MetroDemo\
-      name: MetroDemo.v$(GitVersion_NuGetVersion)
-      type: zip
-    - path: \src\bin\Caliburn.Metro.Demo\
-      name: Caliburn.MetroDemo.v$(GitVersion_NuGetVersion)
-      type: zip
+nuget:
+  disable_publish_on_pr: true
 
-# configuration for master/Release branch
--
-  branches:
-    only:
-      - master
-
-  skip_tags: true
-  image: Visual Studio 2017
-  configuration: Release
-  platform: Any CPU
-
-  install:
-    - choco install gitversion.portable -pre -y
-
-  before_build:
-    - ps: cd src
-    - ps: .paket\paket restore
-    - ps: cd..
-    - ps: gitversion /l console /output buildserver /updateAssemblyInfo
-
-  build:
-    verbosity: minimal
-
-  after_build:
-    - ps: cd src
-    - ps: .paket\paket pack --version $env:GitVersion_NuGetVersion bin
-    - ps: cd..
-
-  cache:
-    - src\packages -> **\packages.config
-    # - '%USERPROFILE%\.nuget\packages -> **\project.json'
-
-  artifacts:
-    - path: \src\bin\MahApps.Metro.*.nupkg
-    - path: \src\bin\MetroDemo\
-      name: MetroDemo.v$(GitVersion_NuGetVersion)
-      type: zip
-    - path: \src\bin\Caliburn.Metro.Demo\
-      name: Caliburn.MetroDemo.v$(GitVersion_NuGetVersion)
-      type: zip
+skip_commits:
+  files:
+    - '**/*.md'
